@@ -15,7 +15,9 @@ struct FIKHUB_DevelopApp: App {
     let repository: UserRepository
     let saveUserProfileUseCase: SaveUserProfileUseCase
     let getLatestUserProfileUseCase: GetLatestUserProfileUseCase
-
+    
+    @StateObject private var profileViewModel: ProfileViewModel
+    
     init() {
         do {
             container = try ModelContainer(for: UserStorage.self)
@@ -23,18 +25,24 @@ struct FIKHUB_DevelopApp: App {
             repository = SwiftDataUserRepository(context: context)
             saveUserProfileUseCase = SaveUserProfileUseCaseImpl(repository: repository)
             getLatestUserProfileUseCase = GetLatestUserProfileUseCaseImpl(repository: repository)
-        } catch {
-            fatalError("Failed to initialize ModelContainer: \(error)")
-        }
-    }
-
-    var body: some Scene {
-        WindowGroup {
+            
             let viewModel = ProfileViewModel(
                 saveUserProfileUseCase: saveUserProfileUseCase,
                 getLatestUserProfileUseCase: getLatestUserProfileUseCase
             )
-            ProfileFormView(viewModel: viewModel)
+            _profileViewModel = StateObject(wrappedValue: viewModel)
+        } catch {
+            fatalError("Failed to initialize ModelContainer: \(error)")
+        }
+    }
+    
+    var body: some Scene {
+        WindowGroup {
+            if profileViewModel.isOnboardingCompleted {
+                InitScheduleView()
+            } else {
+                ProfileFormView(viewModel: profileViewModel)
+            }
         }
     }
 }
@@ -148,7 +156,7 @@ class GetLatestUserProfileUseCaseImpl: GetLatestUserProfileUseCase {
     }
 }
 
-//model
+//models
 struct UserModel: Identifiable {
     var id: UUID
     var onboarding: OnboardingModel
@@ -160,12 +168,20 @@ struct OnboardingModel: Codable {
     var semester: String = ""
 }
 
+struct ScheduleModel: Codable {
+    var subjectName: String = ""
+    var roomLocation: String = ""
+    var day: String = ""
+    var startTime: Date = Date()
+    var endTime: Date = Date()
+}
+
 struct IdentifiableError: Identifiable {
     let id = UUID()
     let error: Error
 }
 
-//component
+//components
 struct TextFieldClear: View {
     let placeholder: String
     @Binding var text: String
@@ -238,22 +254,82 @@ struct ButtonFill: View {
     }
 }
 
-// viewmodel
+struct ScheduleList: View {
+    @State private var items = [
+        ListItem(title: "Pemrograman Web", room: "FIK-201", startTime: "08:00", endTime: "09:00")
+    ]
+
+    var body: some View {
+        List {
+            ForEach(items) { item in
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(item.title)
+                            .font(.headline)
+                        Text(item.room)
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing) {
+                        Text(item.startTime)
+                            .font(.subheadline)
+                        Text(item.endTime)
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                    }
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button(role: .destructive) {
+                        print("tap delete")
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                    
+                    Button {
+                        print("tap edit")
+                    } label: {
+                        Label("Edit", systemImage: "pencil")
+                    }
+                    .tint(.blue)
+                }
+            }
+        }
+        .listStyle(PlainListStyle())
+    }
+}
+
+struct ListItem: Identifiable {
+    let id = UUID()
+    var title: String
+    var room: String
+    var startTime: String
+    var endTime: String
+}
+
+// viewmodels
 class ProfileViewModel: ObservableObject {
     private let saveUserProfileUseCase: SaveUserProfileUseCase
     @Published var error: IdentifiableError?
     private let getLatestUserProfileUseCase: GetLatestUserProfileUseCase
     @Published var savedUser: UserModel?
+    @Published var shouldNavigateToSchedule: Bool = false
 
     
     @Published var name: String = ""
     @Published var selectedProgram: String = "Pilih Program Studi"
     @Published var selectedSemester: String = "Pilih Semester"
     @Published var isSaving: Bool = false
+    @Published var isOnboardingCompleted: Bool {
+        didSet {
+            UserDefaults.standard.set(isOnboardingCompleted, forKey: "isOnboardingCompleted")
+        }
+    }
     
     init(saveUserProfileUseCase: SaveUserProfileUseCase, getLatestUserProfileUseCase: GetLatestUserProfileUseCase) {
         self.saveUserProfileUseCase = saveUserProfileUseCase
         self.getLatestUserProfileUseCase = getLatestUserProfileUseCase
+        self.isOnboardingCompleted = UserDefaults.standard.bool(forKey: "isOnboardingCompleted")
     }
 
     func saveProfile() {
@@ -261,7 +337,6 @@ class ProfileViewModel: ObservableObject {
         do {
             try saveUserProfileUseCase.execute(name: name, prodi: selectedProgram, semester: selectedSemester)
             isSaving = false
-            // Handle successful save (e.g., navigate to next screen)
         } catch {
             self.error = IdentifiableError(error: error)
             isSaving = false
@@ -275,6 +350,14 @@ class ProfileViewModel: ObservableObject {
             self.error = IdentifiableError(error: error)
         }
     }
+    
+    func saveProfileAndNavigate() {
+        saveProfile()
+        isOnboardingCompleted = true
+        shouldNavigateToSchedule = true
+    }
+
+
 
 
 }
@@ -323,13 +406,17 @@ struct ProfileFormView: View {
                 VStack {
                     Spacer()
                     ButtonFill(title: "Lanjutkan", action: {
-                        viewModel.saveProfile()
+                        viewModel.saveProfileAndNavigate()
                     })
                     .disabled(viewModel.isSaving)
                     .padding(.horizontal)
                 }
             }
             .navigationBarTitle("Profile", displayMode: .large)
+            .navigationDestination(isPresented: $viewModel.shouldNavigateToSchedule) {
+                InitScheduleView()
+                    .navigationBarBackButtonHidden(true)
+            }
             .alert(item: $viewModel.error) { identifiableError in
                 Alert(
                     title: Text("Error"),
@@ -365,7 +452,7 @@ struct SemesterView: View {
         7: "Semester 7",
         8: "Semester 8",
     ]
-    @Binding var selectedSemester: String // Tambahkan ini
+    @Binding var selectedSemester: String
     @Environment(\.presentationMode) var presentationMode
 
 
@@ -373,8 +460,8 @@ struct SemesterView: View {
         Form {
             ForEach(Array(semesters.sorted(by: { $0.key < $1.key })), id: \.key) { key, value in
                 Button(action: {
-                    selectedSemester = value // Ubah ini
-                    presentationMode.wrappedValue.dismiss() // Tambahkan ini untuk kembali ke view sebelumnya
+                    selectedSemester = value
+                    presentationMode.wrappedValue.dismiss()
                 }) {
                     Text(value)
                         .foregroundColor(.black)
@@ -410,4 +497,209 @@ struct ProgramsView: View {
     }
 }
 
+struct InitScheduleView: View {
+    @State private var isAddScheduleViewPresented = false
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                VStack {
+                    Spacer()
+                    Text("Untuk menambahkan jadwal kelas Anda, silakan klik tombol tambah (+) yang terletak di sudut kanan bawah.")
+                        .font(.callout)
+                        .foregroundStyle(.gray)
+                        .multilineTextAlignment(.center)
+                        .padding()
+                    Spacer()
+                }
+                
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button {
+                            isAddScheduleViewPresented = true
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.title.weight(.semibold))
+                                .padding()
+                                .background(Color.orange)
+                                .foregroundColor(.white)
+                                .clipShape(Circle())
+                                .shadow(radius: 4, x: 0, y: 4)
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    HStack {
+                        Text("Jadwal")
+                            .font(.headline)
+                        Spacer()
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Selesai") {
+                        print("tap selesai")
+                    }
+                }
+            }
+            .navigationBarTitle("Jadwal", displayMode: .inline)
+            .navigationBarBackButtonHidden(true)
+        }
+        .sheet(isPresented: $isAddScheduleViewPresented) {
+            AddScheduleView()
+        }
+    }
+}
 
+struct AddScheduleView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var date = Date()
+    @State private var selectedDay = 0
+    
+    let daysOfWeek = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    NavigationLink(destination: SubjectPickerView()) {
+                        Text("Mata Kuliah")
+                            .foregroundStyle(.orange)
+                    }
+                    NavigationLink(destination: RoomLocationView()) {
+                        Text("Lokasi")
+                            .foregroundStyle(.orange)
+                    }
+                }
+                Section {
+                    Picker("Hari", selection: $selectedDay) {
+                        ForEach(0..<daysOfWeek.count, id: \.self) { index in
+                            Text(daysOfWeek[index]).tag(index)
+                        }
+                    }
+                    .pickerStyle(MenuPickerStyle())
+                    
+                    DatePicker(
+                        "Mulai",
+                        selection: $date,
+                        displayedComponents: [.hourAndMinute]
+                    )
+                    DatePicker(
+                        "Selesai",
+                        selection: $date,
+                        displayedComponents: [.hourAndMinute]
+                    )
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Batal") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Tambah") {
+                        print("tambah tapped")
+                    }
+                }
+                ToolbarItem(placement: .principal) {
+                    Text("Baru")
+                        .font(.headline)
+                }
+            }
+        }
+    }
+}
+
+struct SubjectPickerView: View {
+    let subjects: [Int:String] = [
+        1: "Analisis Bisnis",
+        2: "Interaksi Manusia Dan Komputer",
+        3: "Manajemen Proyek Sistem Informasi",
+        4: "Pemrograman Web",
+        5: "Pengantar Data Science",
+        6: "Pengantar Teknologi Informasi",
+        7: "Praktikum Interaksi Manusia Dan Komputer",
+        8: "Praktikum Pemrograman Web",
+        9: "Praktikum Sistem Operasi",
+        10: "Sistem Informasi Manajemen",
+        11: "Sistem Operasi",
+        12: "Statistik dan Probabilitas",
+        13: "Technopreneurship",
+    ]
+    @State private var searchText = ""
+
+    var filteredSubjects: [(key: Int, value: String)] {
+        if searchText.isEmpty {
+            return Array(subjects.sorted(by: { $0.key < $1.key }))
+        } else {
+            return subjects.filter { $0.value.lowercased().contains(searchText.lowercased()) }
+                .sorted(by: { $0.key < $1.key })
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(filteredSubjects, id: \.key) { key, value in
+                    Button(action: {
+                        print("tap \(value)")
+                    }) {
+                        Text(value)
+                            .foregroundColor(.black)
+                    }
+                }
+            }
+            .searchable(text: $searchText, prompt: "Cari")
+            .navigationBarTitle("Mata Kuliah", displayMode: .large)
+
+        }
+    }
+}
+
+struct RoomLocationView: View {
+    let subjects: [Int:String] = [
+        1: "FIK-201",
+        2: "FIKLAB-201",
+        3: "FIKLAB-202",
+        4: "FIKLAB-203",
+        5: "FIKLAB-301",
+        6: "FIKLAB-302",
+        7: "FIKLAB-303",
+        8: "FIKLAB-401",
+        9: "FIKLAB-402",
+        10: "FIKLAB-403",
+    ]
+    @State private var searchText = ""
+
+    var filteredSubjects: [(key: Int, value: String)] {
+        if searchText.isEmpty {
+            return Array(subjects.sorted(by: { $0.key < $1.key }))
+        } else {
+            return subjects.filter { $0.value.lowercased().contains(searchText.lowercased()) }
+                .sorted(by: { $0.key < $1.key })
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(filteredSubjects, id: \.key) { key, value in
+                    Button(action: {
+                        print("tap \(value)")
+                    }) {
+                        Text(value)
+                            .foregroundColor(.black)
+                    }
+                }
+            }
+            .navigationBarTitle("Jadwal", displayMode: .large)
+            .searchable(text: $searchText, prompt: "Cari")
+        }
+    }
+}
