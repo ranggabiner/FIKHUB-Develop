@@ -38,11 +38,24 @@ struct FIKHUB_DevelopApp: App {
     
     var body: some Scene {
         WindowGroup {
+            ContentView(profileViewModel: profileViewModel)
+        }
+    }
+}
+
+struct ContentView: View {
+    @ObservedObject var profileViewModel: ProfileViewModel
+
+    var body: some View {
+        Group {
             if profileViewModel.isOnboardingCompleted {
-                InitScheduleView()
+                InitScheduleView(viewModel: profileViewModel)
             } else {
                 ProfileFormView(viewModel: profileViewModel)
             }
+        }
+        .onAppear {
+            profileViewModel.loadLatestUser()
         }
     }
 }
@@ -70,20 +83,22 @@ public class SwiftDataManager {
 class UserStorage {
     var id: UUID
     var onboarding: OnboardingModel
-    
-    init(id: UUID, onboarding: OnboardingModel) {
+    var subjects: [String] // Tambahkan ini
+
+    init(id: UUID, onboarding: OnboardingModel, subjects: [String] = []) {
         self.id = id
         self.onboarding = onboarding
+        self.subjects = subjects
     }
-    
-    func toDomain() -> UserModel{
+
+    func toDomain() -> UserModel {
         return .init(
             id: self.id,
-            onboarding: self.onboarding
+            onboarding: self.onboarding,
+            subjects: self.subjects // Tambahkan ini
         )
     }
 }
-
 
 // repository
 protocol UserRepository {
@@ -101,11 +116,11 @@ class SwiftDataUserRepository: UserRepository {
     }
     
     func saveUser(_ user: UserModel) throws {
-        let userStorage = UserStorage(id: user.id, onboarding: user.onboarding)
+        let userStorage = UserStorage(id: user.id, onboarding: user.onboarding, subjects: user.subjects)
         context.insert(userStorage)
         try context.save()
     }
-    
+
     func getUser(by id: UUID) throws -> UserModel? {
         let descriptor = FetchDescriptor<UserStorage>(predicate: #Predicate { $0.id == id })
         let result = try context.fetch(descriptor)
@@ -122,20 +137,21 @@ class SwiftDataUserRepository: UserRepository {
 }
 
 //usecase
+
 protocol SaveUserProfileUseCase {
-    func execute(name: String, prodi: String, semester: String) throws
+    func execute(name: String, prodi: String, semester: String, subjects: [String]) throws
 }
 
 class SaveUserProfileUseCaseImpl: SaveUserProfileUseCase {
     private let repository: UserRepository
-    
+
     init(repository: UserRepository) {
         self.repository = repository
     }
-    
-    func execute(name: String, prodi: String, semester: String) throws {
+
+    func execute(name: String, prodi: String, semester: String, subjects: [String]) throws {
         let onboarding = OnboardingModel(name: name, prodi: prodi, semester: semester)
-        let user = UserModel(id: UUID(), onboarding: onboarding)
+        let user = UserModel(id: UUID(), onboarding: onboarding, subjects: subjects)
         try repository.saveUser(user)
     }
 }
@@ -160,6 +176,8 @@ class GetLatestUserProfileUseCaseImpl: GetLatestUserProfileUseCase {
 struct UserModel: Identifiable {
     var id: UUID
     var onboarding: OnboardingModel
+    var subjects: [String] // Tambahkan ini
+
 }
 
 struct OnboardingModel: Codable {
@@ -317,7 +335,6 @@ class ProfileViewModel: ObservableObject {
 
     
     @Published var name: String = ""
-    @Published var selectedProgram: String = "Pilih Program Studi"
     @Published var selectedSemester: String = "Pilih Semester"
     @Published var isSaving: Bool = false
     @Published var isOnboardingCompleted: Bool {
@@ -325,6 +342,26 @@ class ProfileViewModel: ObservableObject {
             UserDefaults.standard.set(isOnboardingCompleted, forKey: "isOnboardingCompleted")
         }
     }
+    @Published var subjects: [String] = []
+
+    
+    private let subjectsByProdi: [String: [String]] = [
+        "D3 Sistem Informasi": ["Basis Data", "Pemrograman Web", "Sistem Operasi"],
+        "S1 Sistem Informasi": ["Analisis Sistem Informasi", "Manajemen Proyek TI", "Business Intelligence"],
+        "S1 Informatika": ["Algoritma dan Struktur Data", "Kecerdasan Buatan", "Jaringan Komputer"]
+    ]
+    
+    func updateSubjects() {
+        subjects = subjectsByProdi[selectedProgram] ?? []
+    }
+    
+    @Published var selectedProgram: String = "Pilih Program Studi" {
+        didSet {
+            updateSubjects()
+        }
+    }
+    
+    
     
     init(saveUserProfileUseCase: SaveUserProfileUseCase, getLatestUserProfileUseCase: GetLatestUserProfileUseCase) {
         self.saveUserProfileUseCase = saveUserProfileUseCase
@@ -335,22 +372,30 @@ class ProfileViewModel: ObservableObject {
     func saveProfile() {
         isSaving = true
         do {
-            try saveUserProfileUseCase.execute(name: name, prodi: selectedProgram, semester: selectedSemester)
+            try saveUserProfileUseCase.execute(
+                name: name,
+                prodi: selectedProgram,
+                semester: selectedSemester,
+                subjects: subjects // Tambahkan ini
+            )
             isSaving = false
         } catch {
             self.error = IdentifiableError(error: error)
             isSaving = false
         }
     }
-    
+
     func loadLatestUser() {
         do {
             savedUser = try getLatestUserProfileUseCase.execute()
+            if let user = savedUser {
+                subjects = user.subjects // Muat daftar mata kuliah
+            }
         } catch {
             self.error = IdentifiableError(error: error)
         }
     }
-    
+
     func saveProfileAndNavigate() {
         saveProfile()
         isOnboardingCompleted = true
@@ -414,7 +459,7 @@ struct ProfileFormView: View {
             }
             .navigationBarTitle("Profile", displayMode: .large)
             .navigationDestination(isPresented: $viewModel.shouldNavigateToSchedule) {
-                InitScheduleView()
+                InitScheduleView(viewModel: viewModel)
                     .navigationBarBackButtonHidden(true)
             }
             .alert(item: $viewModel.error) { identifiableError in
@@ -498,7 +543,9 @@ struct ProgramsView: View {
 }
 
 struct InitScheduleView: View {
+    @ObservedObject var viewModel: ProfileViewModel
     @State private var isAddScheduleViewPresented = false
+
     
     var body: some View {
         NavigationStack {
@@ -550,7 +597,7 @@ struct InitScheduleView: View {
             .navigationBarBackButtonHidden(true)
         }
         .sheet(isPresented: $isAddScheduleViewPresented) {
-            AddScheduleView()
+            AddScheduleView(viewModel: viewModel)
         }
     }
 }
@@ -559,6 +606,9 @@ struct AddScheduleView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var date = Date()
     @State private var selectedDay = 0
+    @ObservedObject var viewModel: ProfileViewModel
+    @State private var selectedSubject: String = ""
+
     
     let daysOfWeek = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
     
@@ -566,10 +616,10 @@ struct AddScheduleView: View {
         NavigationStack {
             Form {
                 Section {
-                    NavigationLink(destination: SubjectPickerView()) {
-                        Text("Mata Kuliah")
-                            .foregroundStyle(.orange)
-                    }
+                    NavigationLink(destination: SubjectPickerView(viewModel: viewModel, selectedSubject: $selectedSubject)) {
+                              Text(selectedSubject.isEmpty ? "Pilih Mata Kuliah" : selectedSubject)
+                                  .foregroundStyle(.orange)
+                          }
                     NavigationLink(destination: RoomLocationView()) {
                         Text("Lokasi")
                             .foregroundStyle(.orange)
@@ -605,6 +655,10 @@ struct AddScheduleView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Tambah") {
                         print("tambah tapped")
+                        if !selectedSubject.isEmpty && !viewModel.subjects.contains(selectedSubject) {
+                            viewModel.subjects.append(selectedSubject)
+                            viewModel.saveProfile() // Simpan perubahan
+                        }
                     }
                 }
                 ToolbarItem(placement: .principal) {
@@ -613,55 +667,42 @@ struct AddScheduleView: View {
                 }
             }
         }
+        
     }
 }
 
 struct SubjectPickerView: View {
-    let subjects: [Int:String] = [
-        1: "Analisis Bisnis",
-        2: "Interaksi Manusia Dan Komputer",
-        3: "Manajemen Proyek Sistem Informasi",
-        4: "Pemrograman Web",
-        5: "Pengantar Data Science",
-        6: "Pengantar Teknologi Informasi",
-        7: "Praktikum Interaksi Manusia Dan Komputer",
-        8: "Praktikum Pemrograman Web",
-        9: "Praktikum Sistem Operasi",
-        10: "Sistem Informasi Manajemen",
-        11: "Sistem Operasi",
-        12: "Statistik dan Probabilitas",
-        13: "Technopreneurship",
-    ]
+    @ObservedObject var viewModel: ProfileViewModel
+    @Binding var selectedSubject: String
     @State private var searchText = ""
+    @Environment(\.presentationMode) var presentationMode
 
-    var filteredSubjects: [(key: Int, value: String)] {
+    var filteredSubjects: [String] {
         if searchText.isEmpty {
-            return Array(subjects.sorted(by: { $0.key < $1.key }))
+            return viewModel.subjects
         } else {
-            return subjects.filter { $0.value.lowercased().contains(searchText.lowercased()) }
-                .sorted(by: { $0.key < $1.key })
+            return viewModel.subjects.filter { $0.lowercased().contains(searchText.lowercased()) }
         }
     }
 
     var body: some View {
         NavigationStack {
             List {
-                ForEach(filteredSubjects, id: \.key) { key, value in
+                ForEach(filteredSubjects, id: \.self) { subject in
                     Button(action: {
-                        print("tap \(value)")
+                        selectedSubject = subject
+                        presentationMode.wrappedValue.dismiss()
                     }) {
-                        Text(value)
+                        Text(subject)
                             .foregroundColor(.black)
                     }
                 }
             }
-            .searchable(text: $searchText, prompt: "Cari")
-            .navigationBarTitle("Mata Kuliah", displayMode: .large)
-
+            .navigationBarTitle("Pilih Mata Kuliah", displayMode: .large)
+            .searchable(text: $searchText, prompt: "Cari mata kuliah")
         }
     }
 }
-
 struct RoomLocationView: View {
     let subjects: [Int:String] = [
         1: "FIK-201",
