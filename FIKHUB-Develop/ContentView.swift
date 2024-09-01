@@ -608,6 +608,7 @@ struct AddScheduleView: View {
     @State private var selectedDay = 0
     @ObservedObject var viewModel: ProfileViewModel
     @State private var selectedSubject: String = ""
+    @State private var selectedLocation: String = ""
 
     
     let daysOfWeek = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
@@ -620,8 +621,8 @@ struct AddScheduleView: View {
                               Text(selectedSubject.isEmpty ? "Pilih Mata Kuliah" : selectedSubject)
                                   .foregroundStyle(.orange)
                           }
-                    NavigationLink(destination: RoomLocationView()) {
-                        Text("Lokasi")
+                    NavigationLink(destination: RoomLocationView(selectedLocation: $selectedLocation)) {
+                        Text(selectedLocation.isEmpty ? "Pilih Lokasi" : selectedLocation)
                             .foregroundStyle(.orange)
                     }
                 }
@@ -717,6 +718,9 @@ struct RoomLocationView: View {
         10: "FIKLAB-403",
     ]
     @State private var searchText = ""
+    @Binding var selectedLocation: String
+    @Environment(\.presentationMode) var presentationMode
+
 
     var filteredSubjects: [(key: Int, value: String)] {
         if searchText.isEmpty {
@@ -732,7 +736,8 @@ struct RoomLocationView: View {
             List {
                 ForEach(filteredSubjects, id: \.key) { key, value in
                     Button(action: {
-                        print("tap \(value)")
+                        selectedLocation = value
+                        presentationMode.wrappedValue.dismiss()
                     }) {
                         Text(value)
                             .foregroundColor(.black)
