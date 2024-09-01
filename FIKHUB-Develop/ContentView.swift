@@ -176,7 +176,7 @@ class GetLatestUserProfileUseCaseImpl: GetLatestUserProfileUseCase {
 struct UserModel: Identifiable {
     var id: UUID
     var onboarding: OnboardingModel
-    var subjects: [String] // Tambahkan ini
+    var subjects: [String]
 
 }
 
@@ -347,6 +347,22 @@ class ProfileViewModel: ObservableObject {
         }
     }
     @Published var subjects: [String] = []
+    let dayOrder = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
+
+    var sortedSchedules: [ScheduleItem] {
+        schedules.sorted { (item1, item2) -> Bool in
+            if let index1 = dayOrder.firstIndex(of: item1.day),
+               let index2 = dayOrder.firstIndex(of: item2.day) {
+                if index1 == index2 {
+                    // Jika hari sama, urutkan berdasarkan waktu mulai
+                    return item1.startTime < item2.startTime
+                }
+                // Jika hari berbeda, urutkan berdasarkan urutan hari
+                return index1 < index2
+            }
+            return false
+        }
+    }
 
     
     private let subjectsByProdi: [String: [String]] = [
@@ -567,6 +583,12 @@ struct InitScheduleView: View {
     @ObservedObject var viewModel: ProfileViewModel
     @State private var isAddScheduleViewPresented = false
 
+    var daysWithSchedules: [String] {
+        return viewModel.dayOrder.filter { day in
+            viewModel.sortedSchedules.contains { $0.day == day }
+        }
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -582,8 +604,12 @@ struct InitScheduleView: View {
                     }
                 } else {
                     List {
-                        ForEach(viewModel.schedules) { schedule in
-                            ScheduleItemView(schedule: schedule)
+                        ForEach(daysWithSchedules, id: \.self) { day in
+                            Section(header: Text(day)) {
+                                ForEach(viewModel.sortedSchedules.filter { $0.day == day }) { schedule in
+                                    ScheduleItemView(schedule: schedule)
+                                }
+                            }
                         }
                     }
                 }
