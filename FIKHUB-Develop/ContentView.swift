@@ -186,18 +186,20 @@ struct OnboardingModel: Codable {
     var semester: String = ""
 }
 
-struct ScheduleModel: Codable {
-    var subjectName: String = ""
-    var roomLocation: String = ""
-    var day: String = ""
-    var startTime: Date = Date()
-    var endTime: Date = Date()
-}
-
 struct IdentifiableError: Identifiable {
     let id = UUID()
     let error: Error
 }
+
+struct ScheduleItem: Identifiable, Codable {
+    let id: UUID
+    let subject: String
+    let location: String
+    let day: String
+    let startTime: Date
+    let endTime: Date
+}
+
 
 //components
 struct TextFieldClear: View {
@@ -332,6 +334,8 @@ class ProfileViewModel: ObservableObject {
     private let getLatestUserProfileUseCase: GetLatestUserProfileUseCase
     @Published var savedUser: UserModel?
     @Published var shouldNavigateToSchedule: Bool = false
+    @Published var schedules: [ScheduleItem] = []
+
 
     
     @Published var name: String = ""
@@ -402,6 +406,23 @@ class ProfileViewModel: ObservableObject {
         shouldNavigateToSchedule = true
     }
 
+    func saveSchedule(_ schedule: ScheduleItem) {
+        schedules.append(schedule)
+        saveSchedulesToStorage()
+    }
+
+    private func saveSchedulesToStorage() {
+        if let encoded = try? JSONEncoder().encode(schedules) {
+            UserDefaults.standard.set(encoded, forKey: "savedSchedules")
+        }
+    }
+
+    func loadSchedulesFromStorage() {
+        if let savedSchedules = UserDefaults.standard.data(forKey: "savedSchedules"),
+           let decodedSchedules = try? JSONDecoder().decode([ScheduleItem].self, from: savedSchedules) {
+            schedules = decodedSchedules
+        }
+    }
 
 
 
@@ -546,20 +567,27 @@ struct InitScheduleView: View {
     @ObservedObject var viewModel: ProfileViewModel
     @State private var isAddScheduleViewPresented = false
 
-    
     var body: some View {
         NavigationStack {
             ZStack {
-                VStack {
-                    Spacer()
-                    Text("Untuk menambahkan jadwal kelas Anda, silakan klik tombol tambah (+) yang terletak di sudut kanan bawah.")
-                        .font(.callout)
-                        .foregroundStyle(.gray)
-                        .multilineTextAlignment(.center)
-                        .padding()
-                    Spacer()
+                if viewModel.schedules.isEmpty {
+                    VStack {
+                        Spacer()
+                        Text("Untuk menambahkan jadwal kelas Anda, silakan klik tombol tambah (+) yang terletak di sudut kanan bawah.")
+                            .font(.callout)
+                            .foregroundStyle(.gray)
+                            .multilineTextAlignment(.center)
+                            .padding()
+                        Spacer()
+                    }
+                } else {
+                    List {
+                        ForEach(viewModel.schedules) { schedule in
+                            ScheduleItemView(schedule: schedule)
+                        }
+                    }
                 }
-                
+
                 VStack {
                     Spacer()
                     HStack {
@@ -579,36 +607,60 @@ struct InitScheduleView: View {
                     }
                 }
             }
+            .navigationBarTitle("Jadwal", displayMode: .inline)
+            .navigationBarBackButtonHidden(true)
             .toolbar {
-                ToolbarItem(placement: .principal) {
-                    HStack {
-                        Text("Jadwal")
-                            .font(.headline)
-                        Spacer()
-                    }
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Selesai") {
                         print("tap selesai")
                     }
                 }
             }
-            .navigationBarTitle("Jadwal", displayMode: .inline)
-            .navigationBarBackButtonHidden(true)
+            .sheet(isPresented: $isAddScheduleViewPresented) {
+                AddScheduleView(viewModel: viewModel)
+            }
+            .onAppear {
+                viewModel.loadSchedulesFromStorage()
+            }
         }
-        .sheet(isPresented: $isAddScheduleViewPresented) {
-            AddScheduleView(viewModel: viewModel)
+    }
+}
+
+struct ScheduleItemView: View {
+    let schedule: ScheduleItem
+    
+    var body: some View {
+        VStack(alignment: .leading) {
+            Text(schedule.subject)
+                .font(.headline)
+            Text(schedule.location)
+                .font(.subheadline)
+            HStack {
+                Text(schedule.day)
+                Spacer()
+                Text("\(formatTime(schedule.startTime)) - \(formatTime(schedule.endTime))")
+            }
+            .font(.caption)
+            .foregroundColor(.gray)
         }
+    }
+    
+    private func formatTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 }
 
 struct AddScheduleView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var date = Date()
-    @State private var selectedDay = 0
     @ObservedObject var viewModel: ProfileViewModel
     @State private var selectedSubject: String = ""
     @State private var selectedLocation: String = ""
+    @State private var selectedDay = 0
+    @State private var startTime = Date()
+    @State private var endTime = Date()
+
 
     
     let daysOfWeek = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
@@ -632,44 +684,32 @@ struct AddScheduleView: View {
                             Text(daysOfWeek[index]).tag(index)
                         }
                     }
-                    .pickerStyle(MenuPickerStyle())
-                    
-                    DatePicker(
-                        "Mulai",
-                        selection: $date,
-                        displayedComponents: [.hourAndMinute]
-                    )
-                    DatePicker(
-                        "Selesai",
-                        selection: $date,
-                        displayedComponents: [.hourAndMinute]
-                    )
+                }
+                Section {
+                    DatePicker("Jam Mulai", selection: $startTime, displayedComponents: .hourAndMinute)
+                    DatePicker("Jam Selesai", selection: $endTime, displayedComponents: .hourAndMinute)
                 }
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Batal") {
-                        dismiss()
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Tambah") {
-                        print("tambah tapped")
-                        if !selectedSubject.isEmpty && !viewModel.subjects.contains(selectedSubject) {
-                            viewModel.subjects.append(selectedSubject)
-                            viewModel.saveProfile() // Simpan perubahan
-                        }
-                    }
-                }
-                ToolbarItem(placement: .principal) {
-                    Text("Baru")
-                        .font(.headline)
-                }
-            }
+            .navigationBarTitle("Tambah Jadwal", displayMode: .inline)
+            .navigationBarItems(trailing: Button("Simpan") {
+                saveSchedule()
+            })
         }
         
     }
+    private func saveSchedule() {
+        let newSchedule = ScheduleItem(
+            id: UUID(),
+            subject: selectedSubject,
+            location: selectedLocation,
+            day: daysOfWeek[selectedDay],
+            startTime: startTime,
+            endTime: endTime
+        )
+        viewModel.saveSchedule(newSchedule)
+        dismiss()
+    }
+
 }
 
 struct SubjectPickerView: View {
