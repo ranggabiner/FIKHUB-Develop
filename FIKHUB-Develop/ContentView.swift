@@ -563,7 +563,7 @@ struct InitScheduleView: View {
                 if viewModel.schedules.isEmpty {
                     VStack {
                         Spacer()
-                        Text("Untuk menambahkan jadwal kelas Anda, silakan klik tombol tambah (+) yang terletak di sudut kanan bawah.")
+                        Text("Untuk menambahkan jadwal kelas Anda, silakan klik tombol tambah (+) yang terletak di sudut kanan atas.")
                             .font(.callout)
                             .foregroundStyle(.gray)
                             .multilineTextAlignment(.center)
@@ -589,32 +589,33 @@ struct InitScheduleView: View {
                     }
                     .listStyle(.plain)
                 }
-
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Button {
-                            isAddScheduleViewPresented = true
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.title.weight(.semibold))
-                                .padding()
-                                .background(Color.orange)
-                                .foregroundColor(.white)
-                                .clipShape(Circle())
-                                .shadow(radius: 4, x: 0, y: 4)
-                        }
-                        .padding(.horizontal)
-                    }
-                }
             }
-            .navigationBarTitle("Jadwal", displayMode: .inline)
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarItems(leading:
+                Text("Jadwal")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+            )
             .navigationBarBackButtonHidden(true)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Selesai") {
-                        print("tap selesai")
+                        Button(action: {
+                            isAddScheduleViewPresented = true
+                        }, label: {
+                            Image(systemName: "plus")
+                                .font(.subheadline)
+                        })
+                }
+                ToolbarItem(placement: .bottomBar) {
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            print("tap Selesai")
+                        }, label: {
+                            Text("Selesai")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                        })
                     }
                 }
             }
@@ -715,7 +716,7 @@ struct AddScheduleView: View {
                     DatePicker("Jam Selesai", selection: $endTime, displayedComponents: .hourAndMinute)
                 }
             }
-            .navigationBarTitle("Tambah Jadwal", displayMode: .inline)
+            .navigationBarTitle("Tambah", displayMode: .inline)
             .navigationBarItems(trailing: Button("Simpan") {
                 saveSchedule()
             })
@@ -775,7 +776,7 @@ struct EditScheduleView: View {
                     DatePicker("Jam Selesai", selection: $editedSchedule.endTime, displayedComponents: .hourAndMinute)
                 }
             }
-            .navigationBarTitle("Edit Jadwal", displayMode: .inline)
+            .navigationBarTitle("Edit", displayMode: .inline)
             .navigationBarItems(
                 leading: Button("Batal") { dismiss() },
                 trailing: Button("Simpan") {
