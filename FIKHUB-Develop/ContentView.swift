@@ -53,7 +53,7 @@ struct ContentView: View {
             } else if !profileViewModel.isInitScheduleCompleted {
                 InitScheduleView(viewModel: profileViewModel)
             } else {
-                ScheduleView()
+                MainTabView(profileViewModel: profileViewModel)
             }
         }
         .onAppear {
@@ -284,6 +284,16 @@ struct ListItem: Identifiable {
     var endTime: String
 }
 
+//extension
+extension ProfileViewModel {
+    func dayName(for date: Date) -> String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "id_ID")
+        dateFormatter.dateFormat = "EEEE"
+        return dateFormatter.string(from: date)
+    }
+}
+
 // viewmodels
 class ProfileViewModel: ObservableObject {
     private let saveUserProfileUseCase: SaveUserProfileUseCase
@@ -421,10 +431,69 @@ class ProfileViewModel: ObservableObject {
         }
     }
 
-
+    func schedulesForDate(_ date: Date) -> [ScheduleItem] {
+        let calendar = Calendar.current
+        let weekday = calendar.component(.weekday, from: date)
+        let dayName = daysOfWeek[weekday - 1] // Assuming daysOfWeek is ["Minggu", "Senin", "Selasa", ...]
+        
+        return sortedSchedules.filter { $0.day == dayName }
+    }
+    
+    var todaySchedules: [ScheduleItem] {
+        schedulesForDate(Date())
+    }
+    
+    var tomorrowSchedules: [ScheduleItem] {
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date())!
+        return schedulesForDate(tomorrow)
+    }
+    
+    let daysOfWeek = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"]
 }
 
 //views
+struct MainTabView: View {
+    @StateObject var profileViewModel: ProfileViewModel
+    
+    var body: some View {
+        TabView {
+            HomeView()
+                .tabItem {
+                    Label("Home", systemImage: "house")
+                }
+            
+            ScheduleView(viewModel: profileViewModel)
+                .tabItem {
+                    Label("Schedule", systemImage: "calendar")
+                }
+            
+            MateriView()
+                .tabItem {
+                    Label("Materi", systemImage: "book")
+                }
+        }
+    }
+}
+
+struct HomeView: View {
+    var body: some View {
+        NavigationView {
+            Text("Home Content")
+                .navigationTitle("Home")
+        }
+    }
+}
+
+struct MateriView: View {
+    var body: some View {
+        NavigationView {
+            Text("Materi Content")
+                .navigationTitle("Materi")
+        }
+    }
+}
+
+
 struct ProfileFormView: View {
     @StateObject private var viewModel: ProfileViewModel
     @State private var showingSavedData = false
@@ -643,7 +712,7 @@ struct InitScheduleView: View {
                 viewModel.loadSchedulesFromStorage()
             }
             .navigationDestination(isPresented: $viewModel.shouldNavigateToHome) {
-                ScheduleView()
+                ScheduleView(viewModel: viewModel)
                     .navigationBarBackButtonHidden(true)
             }
         }
@@ -885,32 +954,163 @@ struct RoomLocationView: View {
 }
 
 struct ScheduleView: View {
-    @State private var selectedSegment = 0
-    let segments = ["Singkat", "Semua"]
-
+    @ObservedObject var viewModel: ProfileViewModel
+    @State private var selectedSegment = 1
+    @State private var isAddScheduleViewPresented = false
+    @State private var editingSchedule: ScheduleItem?
+    
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Your main content goes here
-                Text("Schedule content for \(segments[selectedSegment])")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                Spacer()
+        NavigationStack {
+            VStack {
+                Picker("", selection: $selectedSegment) {
+                    Text("Hari Ini").tag(1)
+                    Text("Besok").tag(2)
+                    Text("Semua").tag(0)
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .padding()
+                
+                if selectedSegment == 0 {
+                    AllSchedulesView(viewModel: viewModel)
+                } else if selectedSegment == 1 {
+                    TodayScheduleView(viewModel: viewModel)
+                } else {
+                    TomorrowScheduleView(viewModel: viewModel)
+                }
             }
-            .navigationTitle("Jadwal")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarItems(leading: Text("Jadwal").font(.headline))
             .toolbar {
-                ToolbarItem(placement: .principal) {
-                    VStack {
-                        Picker("Schedule", selection: $selectedSegment) {
-                            ForEach(0..<segments.count, id: \.self) { index in
-                                Text(segments[index])
-                            }
-                        }
-                        .pickerStyle(SegmentedPickerStyle())
-                        .frame(width: 220)
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: {
+                        isAddScheduleViewPresented = true
+                    }) {
+                        Image(systemName: "plus")
                     }
                 }
             }
         }
+        .sheet(isPresented: $isAddScheduleViewPresented) {
+            AddScheduleView(viewModel: viewModel)
+        }
+        .sheet(item: $editingSchedule) { schedule in
+            EditScheduleView(viewModel: viewModel, schedule: schedule)
+        }
+        .onAppear {
+            viewModel.loadSchedulesFromStorage()
+        }
     }
 }
+
+struct AllSchedulesView: View {
+    @ObservedObject var viewModel: ProfileViewModel
+    @State private var isAddScheduleViewPresented = false
+    @State private var editingSchedule: ScheduleItem?
+    
+    var daysWithSchedules: [String] {
+        return viewModel.dayOrder.filter { day in
+            viewModel.sortedSchedules.contains { $0.day == day }
+        }
+    }
+    
+    var body: some View {
+        ZStack {
+            if viewModel.schedules.isEmpty {
+                VStack {
+                    Spacer()
+                    Text("Untuk menambahkan jadwal kelas Anda, silakan klik tombol tambah (+) yang terletak di sudut kanan atas.")
+                        .font(.callout)
+                        .foregroundStyle(.gray)
+                        .multilineTextAlignment(.center)
+                        .padding()
+                    Spacer()
+                }
+            } else {
+                List {
+                    ForEach(daysWithSchedules, id: \.self) { day in
+                        Section(header: Text(day).textCase(.uppercase).foregroundStyle(.orange)) {
+                            ForEach(viewModel.sortedSchedules.filter { $0.day == day }) { schedule in
+                                ScheduleItemView(schedule: schedule,
+                                                 onDelete: { viewModel.deleteSchedule(schedule) },
+                                                 onEdit: { editingSchedule = schedule })
+                            }
+                        }
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
+        .sheet(isPresented: $isAddScheduleViewPresented) {
+            AddScheduleView(viewModel: viewModel)
+        }
+        .sheet(item: $editingSchedule) { schedule in
+            EditScheduleView(viewModel: viewModel, schedule: schedule)
+        }
+        .onAppear {
+            viewModel.loadSchedulesFromStorage()
+        }
+    }
+}
+
+struct TodayScheduleView: View {
+    @ObservedObject var viewModel: ProfileViewModel
+    
+    var body: some View {
+        VStack(alignment: .leading) {
+            if viewModel.todaySchedules.isEmpty {
+                VStack {
+                    Spacer()
+                    Text("Tidak ada jadwal hari ini")
+                        .foregroundColor(.gray)
+                        .padding()
+                    Spacer()
+                }
+            } else {
+                    List(viewModel.todaySchedules) { schedule in
+                        Section(header:
+                                    Text(viewModel.dayName(for: Calendar.current.date(byAdding: .day, value: 0, to: Date())!).uppercased()).textCase(.uppercase).foregroundStyle(.orange)) {
+                        ScheduleItemView(schedule: schedule, onDelete: {
+                            viewModel.deleteSchedule(schedule)
+                        }, onEdit: {
+                            // Handle edit action
+                        })
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
+    }
+}
+
+struct TomorrowScheduleView: View {
+    @ObservedObject var viewModel: ProfileViewModel
+    
+    var body: some View {
+        VStack(alignment: .leading) {
+            
+            if viewModel.tomorrowSchedules.isEmpty {
+                VStack {
+                    Spacer()
+                    Text("Tidak ada jadwal untuk besok")
+                        .foregroundColor(.gray)
+                        .padding()
+                    Spacer()
+                }
+            } else {
+                List(viewModel.tomorrowSchedules) { schedule in
+                    Section(header:         
+                                Text(viewModel.dayName(for: Calendar.current.date(byAdding: .day, value: 1, to: Date())!).uppercased()).textCase(.uppercase).foregroundStyle(.orange)) {
+                        ScheduleItemView(schedule: schedule, onDelete: {
+                            viewModel.deleteSchedule(schedule)
+                        }, onEdit: {
+                            // Handle edit action
+                        })
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
+    }
+}
+
+
