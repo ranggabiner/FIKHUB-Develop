@@ -467,9 +467,9 @@ struct MainTabView: View {
                     Label("Schedule", systemImage: "calendar")
                 }
             
-            MateriView(profileViewModel: profileViewModel)
+            MataKuliahView(profileViewModel: profileViewModel)
                 .tabItem {
-                    Label("Materi", systemImage: "book")
+                    Label("Mata Kuliah", systemImage: "book")
                 }
         }
         .onAppear {
@@ -487,7 +487,7 @@ struct HomeView: View {
     }
 }
 
-struct MateriView: View {
+struct MataKuliahView: View {
     @ObservedObject var profileViewModel: ProfileViewModel
     
     var uniqueSubjects: [String] {
@@ -505,7 +505,7 @@ struct MateriView: View {
                     }
                 }
             }
-            .navigationTitle("Materi")
+            .navigationTitle("Mata Kuliah")
             .onAppear {
                 profileViewModel.loadSchedulesFromStorage()
             }
