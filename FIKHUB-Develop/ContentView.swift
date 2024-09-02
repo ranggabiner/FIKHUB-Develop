@@ -978,8 +978,9 @@ struct ScheduleView: View {
                     TomorrowScheduleView(viewModel: viewModel)
                 }
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationBarItems(leading: Text("Jadwal").font(.headline))
+            .navigationTitle("Jadwal")
+//            .navigationBarTitleDisplayMode(.large)
+//            .navigationBarItems(leading: Text("Jadwal").font(.headline))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: {
