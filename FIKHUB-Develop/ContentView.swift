@@ -193,11 +193,11 @@ struct IdentifiableError: Identifiable {
 
 struct ScheduleItem: Identifiable, Codable {
     let id: UUID
-    let subject: String
-    let location: String
-    let day: String
-    let startTime: Date
-    let endTime: Date
+    var subject: String
+    var location: String
+    var day: String
+    var startTime: Date
+    var endTime: Date
 }
 
 
@@ -395,6 +395,17 @@ class ProfileViewModel: ObservableObject {
         }
     }
 
+    func deleteSchedule(_ schedule: ScheduleItem) {
+        schedules.removeAll { $0.id == schedule.id }
+        saveSchedulesToStorage()
+    }
+
+    func updateSchedule(_ updatedSchedule: ScheduleItem) {
+        if let index = schedules.firstIndex(where: { $0.id == updatedSchedule.id }) {
+            schedules[index] = updatedSchedule
+            saveSchedulesToStorage()
+        }
+    }
 
 
 }
@@ -537,6 +548,8 @@ struct ProgramsView: View {
 struct InitScheduleView: View {
     @ObservedObject var viewModel: ProfileViewModel
     @State private var isAddScheduleViewPresented = false
+    @State private var editingSchedule: ScheduleItem?
+
 
     var daysWithSchedules: [String] {
         return viewModel.dayOrder.filter { day in
@@ -562,7 +575,14 @@ struct InitScheduleView: View {
                         ForEach(daysWithSchedules, id: \.self) { day in
                             Section(header: Text(day).textCase(.uppercase).foregroundStyle(.orange)) {
                                 ForEach(viewModel.sortedSchedules.filter { $0.day == day }) { schedule in
-                                    ScheduleItemView(schedule: schedule)
+                                    ScheduleItemView(schedule: schedule,
+                                        onDelete: {
+                                            viewModel.deleteSchedule(schedule)
+                                        },
+                                        onEdit: {
+                                            editingSchedule = schedule
+                                        }
+                                    )
                                 }
                             }
                         }
@@ -601,6 +621,9 @@ struct InitScheduleView: View {
             .sheet(isPresented: $isAddScheduleViewPresented) {
                 AddScheduleView(viewModel: viewModel)
             }
+            .sheet(item: $editingSchedule) { schedule in
+                EditScheduleView(viewModel: viewModel, schedule: schedule)
+            }
             .onAppear {
                 viewModel.loadSchedulesFromStorage()
             }
@@ -610,6 +633,9 @@ struct InitScheduleView: View {
 
 struct ScheduleItemView: View {
     let schedule: ScheduleItem
+    let onDelete: () -> Void
+    let onEdit: () -> Void
+
     
     var body: some View {
         HStack {
@@ -619,9 +645,9 @@ struct ScheduleItemView: View {
                 HStack {
                     Image(systemName: "mappin.and.ellipse")
                     Text(schedule.location)
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
                 }
+                .font(.subheadline)
+                .foregroundColor(.gray)
             }
             Spacer()
             VStack(alignment: .trailing) {
@@ -633,19 +659,15 @@ struct ScheduleItemView: View {
             }
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            Button(role: .destructive) {
-                print("tap delete")
-            } label: {
-                Label("Delete", systemImage: "trash")
+            Button(role: .destructive, action: onDelete) {
+                Label("Hapus", systemImage: "trash")
             }
-            
-            Button {
-                print("tap edit")
-            } label: {
+            Button(action: onEdit) {
                 Label("Edit", systemImage: "pencil")
             }
             .tint(.blue)
         }
+
     }
     
     private func formatTime(_ date: Date) -> String {
@@ -697,6 +719,9 @@ struct AddScheduleView: View {
             .navigationBarItems(trailing: Button("Simpan") {
                 saveSchedule()
             })
+            .navigationBarItems(leading: Button("Batal") {
+                dismiss()
+            })
         }
         
     }
@@ -713,6 +738,53 @@ struct AddScheduleView: View {
         dismiss()
     }
 
+}
+
+struct EditScheduleView: View {
+    @ObservedObject var viewModel: ProfileViewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var editedSchedule: ScheduleItem
+
+    init(viewModel: ProfileViewModel, schedule: ScheduleItem) {
+        self.viewModel = viewModel
+        _editedSchedule = State(initialValue: schedule)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    NavigationLink(destination: SubjectPickerView(viewModel: viewModel, selectedSubject: $editedSchedule.subject)) {
+                        Text( editedSchedule.subject)
+                                  .foregroundStyle(.orange)
+                          }
+                    NavigationLink(destination: RoomLocationView(selectedLocation: $editedSchedule.location)) {
+                        Text( editedSchedule.location)
+                            .foregroundStyle(.orange)
+                    }
+                }
+                Section {
+                    Picker("Hari", selection: $editedSchedule.day) {
+                        ForEach(viewModel.dayOrder, id: \.self) { day in
+                            Text(day).tag(day)
+                        }
+                    }
+                }
+                Section {
+                    DatePicker("Jam Mulai", selection: $editedSchedule.startTime, displayedComponents: .hourAndMinute)
+                    DatePicker("Jam Selesai", selection: $editedSchedule.endTime, displayedComponents: .hourAndMinute)
+                }
+            }
+            .navigationBarTitle("Edit Jadwal", displayMode: .inline)
+            .navigationBarItems(
+                leading: Button("Batal") { dismiss() },
+                trailing: Button("Simpan") {
+                    viewModel.updateSchedule(editedSchedule)
+                    dismiss()
+                }
+            )
+        }
+    }
 }
 
 struct SubjectPickerView: View {
