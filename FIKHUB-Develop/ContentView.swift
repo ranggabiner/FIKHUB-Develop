@@ -274,51 +274,6 @@ struct ButtonFill: View {
     }
 }
 
-struct ScheduleList: View {
-    @State private var items = [
-        ListItem(title: "Pemrograman Web", room: "FIK-201", startTime: "08:00", endTime: "09:00")
-    ]
-
-    var body: some View {
-        List {
-            ForEach(items) { item in
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text(item.title)
-                            .font(.headline)
-                        Text(item.room)
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing) {
-                        Text(item.startTime)
-                            .font(.subheadline)
-                        Text(item.endTime)
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                    }
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button(role: .destructive) {
-                        print("tap delete")
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                    
-                    Button {
-                        print("tap edit")
-                    } label: {
-                        Label("Edit", systemImage: "pencil")
-                    }
-                    .tint(.blue)
-                }
-            }
-        }
-        .listStyle(PlainListStyle())
-    }
-}
-
 struct ListItem: Identifiable {
     let id = UUID()
     var title: String
@@ -605,13 +560,14 @@ struct InitScheduleView: View {
                 } else {
                     List {
                         ForEach(daysWithSchedules, id: \.self) { day in
-                            Section(header: Text(day)) {
+                            Section(header: Text(day).textCase(.uppercase).foregroundStyle(.orange)) {
                                 ForEach(viewModel.sortedSchedules.filter { $0.day == day }) { schedule in
                                     ScheduleItemView(schedule: schedule)
                                 }
                             }
                         }
                     }
+                    .listStyle(.plain)
                 }
 
                 VStack {
@@ -656,18 +612,39 @@ struct ScheduleItemView: View {
     let schedule: ScheduleItem
     
     var body: some View {
-        VStack(alignment: .leading) {
-            Text(schedule.subject)
-                .font(.headline)
-            Text(schedule.location)
-                .font(.subheadline)
-            HStack {
-                Text(schedule.day)
-                Spacer()
-                Text("\(formatTime(schedule.startTime)) - \(formatTime(schedule.endTime))")
+        HStack {
+            VStack(alignment: .leading) {
+                Text(schedule.subject)
+                    .font(.headline)
+                HStack {
+                    Image(systemName: "mappin.and.ellipse")
+                    Text(schedule.location)
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                }
             }
-            .font(.caption)
-            .foregroundColor(.gray)
+            Spacer()
+            VStack(alignment: .trailing) {
+                Text(formatTime(schedule.startTime))
+                    .font(.subheadline)
+                Text(formatTime(schedule.endTime))
+                    .font(.subheadline)
+                    .foregroundColor(.gray)
+            }
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                print("tap delete")
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            
+            Button {
+                print("tap edit")
+            } label: {
+                Label("Edit", systemImage: "pencil")
+            }
+            .tint(.blue)
         }
     }
     
