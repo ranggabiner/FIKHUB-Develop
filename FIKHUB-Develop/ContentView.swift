@@ -467,11 +467,14 @@ struct MainTabView: View {
                     Label("Schedule", systemImage: "calendar")
                 }
             
-            MateriView()
+            MateriView(profileViewModel: profileViewModel)
                 .tabItem {
                     Label("Materi", systemImage: "book")
                 }
         }
+        .onAppear {
+                 profileViewModel.loadSchedulesFromStorage()
+             }
     }
 }
 
@@ -485,14 +488,30 @@ struct HomeView: View {
 }
 
 struct MateriView: View {
+    @ObservedObject var profileViewModel: ProfileViewModel
+    
+    var uniqueSubjects: [String] {
+        Array(Set(profileViewModel.schedules.map { $0.subject })).sorted()
+    }
+    
     var body: some View {
         NavigationView {
-            Text("Materi Content")
-                .navigationTitle("Materi")
+            List {
+                ForEach(uniqueSubjects, id: \.self) { subject in
+                    Button(action: {
+                        print("Selected subject: \(subject)")
+                    }) {
+                        Text(subject)
+                    }
+                }
+            }
+            .navigationTitle("Materi")
+            .onAppear {
+                profileViewModel.loadSchedulesFromStorage()
+            }
         }
     }
 }
-
 
 struct ProfileFormView: View {
     @StateObject private var viewModel: ProfileViewModel
