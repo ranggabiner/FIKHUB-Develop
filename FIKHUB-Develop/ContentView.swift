@@ -48,10 +48,12 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if profileViewModel.isOnboardingCompleted {
+            if !profileViewModel.isOnboardingCompleted {
+                ProfileFormView(viewModel: profileViewModel)
+            } else if !profileViewModel.isInitScheduleCompleted {
                 InitScheduleView(viewModel: profileViewModel)
             } else {
-                ProfileFormView(viewModel: profileViewModel)
+                ScheduleView()
             }
         }
         .onAppear {
@@ -289,6 +291,7 @@ class ProfileViewModel: ObservableObject {
     private let getLatestUserProfileUseCase: GetLatestUserProfileUseCase
     @Published var savedUser: UserModel?
     @Published var shouldNavigateToSchedule: Bool = false
+    @Published var shouldNavigateToHome: Bool = false
     @Published var schedules: [ScheduleItem] = []
 
 
@@ -299,6 +302,11 @@ class ProfileViewModel: ObservableObject {
     @Published var isOnboardingCompleted: Bool {
         didSet {
             UserDefaults.standard.set(isOnboardingCompleted, forKey: "isOnboardingCompleted")
+        }
+    }
+    @Published var isInitScheduleCompleted: Bool {
+        didSet {
+            UserDefaults.standard.set(isInitScheduleCompleted, forKey: "isInitScheduleCompleted")
         }
     }
     @Published var subjects: [String] = []
@@ -342,6 +350,7 @@ class ProfileViewModel: ObservableObject {
         self.saveUserProfileUseCase = saveUserProfileUseCase
         self.getLatestUserProfileUseCase = getLatestUserProfileUseCase
         self.isOnboardingCompleted = UserDefaults.standard.bool(forKey: "isOnboardingCompleted")
+        self.isInitScheduleCompleted = UserDefaults.standard.bool(forKey: "isInitScheduleCompleted")
     }
 
     func saveProfile() {
@@ -375,6 +384,11 @@ class ProfileViewModel: ObservableObject {
         saveProfile()
         isOnboardingCompleted = true
         shouldNavigateToSchedule = true
+    }
+    
+    func ScheduleNavigate() {
+        isInitScheduleCompleted = true
+        shouldNavigateToHome = true
     }
 
     func saveSchedule(_ schedule: ScheduleItem) {
@@ -610,7 +624,7 @@ struct InitScheduleView: View {
                     HStack {
                         Spacer()
                         Button(action: {
-                            print("tap Selesai")
+                            viewModel.ScheduleNavigate()
                         }, label: {
                             Text("Selesai")
                                 .font(.subheadline)
@@ -627,6 +641,10 @@ struct InitScheduleView: View {
             }
             .onAppear {
                 viewModel.loadSchedulesFromStorage()
+            }
+            .navigationDestination(isPresented: $viewModel.shouldNavigateToHome) {
+                ScheduleView()
+                    .navigationBarBackButtonHidden(true)
             }
         }
     }
@@ -862,6 +880,37 @@ struct RoomLocationView: View {
             }
             .navigationBarTitle("Jadwal", displayMode: .large)
             .searchable(text: $searchText, prompt: "Cari")
+        }
+    }
+}
+
+struct ScheduleView: View {
+    @State private var selectedSegment = 0
+    let segments = ["Singkat", "Semua"]
+
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                // Your main content goes here
+                Text("Schedule content for \(segments[selectedSegment])")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                Spacer()
+            }
+            .navigationTitle("Jadwal")
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    VStack {
+                        Picker("Schedule", selection: $selectedSegment) {
+                            ForEach(0..<segments.count, id: \.self) { index in
+                                Text(segments[index])
+                            }
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                        .frame(width: 220)
+                    }
+                }
+            }
         }
     }
 }
