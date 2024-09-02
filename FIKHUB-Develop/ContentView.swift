@@ -979,8 +979,6 @@ struct ScheduleView: View {
                 }
             }
             .navigationTitle("Jadwal")
-//            .navigationBarTitleDisplayMode(.large)
-//            .navigationBarItems(leading: Text("Jadwal").font(.headline))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: {
@@ -1055,6 +1053,8 @@ struct AllSchedulesView: View {
 
 struct TodayScheduleView: View {
     @ObservedObject var viewModel: ProfileViewModel
+    @State private var editingSchedule: ScheduleItem?
+
     
     var body: some View {
         VStack(alignment: .leading) {
@@ -1067,24 +1067,27 @@ struct TodayScheduleView: View {
                     Spacer()
                 }
             } else {
-                    List(viewModel.todaySchedules) { schedule in
-                        Section(header:
-                                    Text(viewModel.dayName(for: Calendar.current.date(byAdding: .day, value: 0, to: Date())!).uppercased()).textCase(.uppercase).foregroundStyle(.orange)) {
-                        ScheduleItemView(schedule: schedule, onDelete: {
-                            viewModel.deleteSchedule(schedule)
-                        }, onEdit: {
-                            // Handle edit action
-                        })
-                    }
+                List {
+                    Section(header: Text(viewModel.dayName(for: Calendar.current.date(byAdding: .day, value: 0, to: Date())!).uppercased()).textCase(.uppercase).foregroundStyle(.orange)) {
+                        ForEach(viewModel.todaySchedules) { schedule in
+                            ScheduleItemView(schedule: schedule,
+                                    onDelete: { viewModel.deleteSchedule(schedule) },
+                                    onEdit: { editingSchedule = schedule })
+                            }
+                        }
                 }
                 .listStyle(.plain)
             }
+        }
+        .sheet(item: $editingSchedule) { schedule in
+            EditScheduleView(viewModel: viewModel, schedule: schedule)
         }
     }
 }
 
 struct TomorrowScheduleView: View {
     @ObservedObject var viewModel: ProfileViewModel
+    @State private var editingSchedule: ScheduleItem?
     
     var body: some View {
         VStack(alignment: .leading) {
@@ -1098,18 +1101,20 @@ struct TomorrowScheduleView: View {
                     Spacer()
                 }
             } else {
-                List(viewModel.tomorrowSchedules) { schedule in
-                    Section(header:         
-                                Text(viewModel.dayName(for: Calendar.current.date(byAdding: .day, value: 1, to: Date())!).uppercased()).textCase(.uppercase).foregroundStyle(.orange)) {
-                        ScheduleItemView(schedule: schedule, onDelete: {
-                            viewModel.deleteSchedule(schedule)
-                        }, onEdit: {
-                            // Handle edit action
-                        })
-                    }
+                List {
+                    Section(header: Text(viewModel.dayName(for: Calendar.current.date(byAdding: .day, value: 1, to: Date())!).uppercased()).textCase(.uppercase).foregroundStyle(.orange)) {
+                        ForEach(viewModel.tomorrowSchedules) { schedule in
+                            ScheduleItemView(schedule: schedule,
+                                    onDelete: { viewModel.deleteSchedule(schedule) },
+                                    onEdit: { editingSchedule = schedule })
+                            }
+                        }
                 }
                 .listStyle(.plain)
             }
+        }
+        .sheet(item: $editingSchedule) { schedule in
+            EditScheduleView(viewModel: viewModel, schedule: schedule)
         }
     }
 }
