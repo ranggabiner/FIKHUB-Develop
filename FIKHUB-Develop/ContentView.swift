@@ -202,6 +202,12 @@ struct ScheduleItem: Identifiable, Codable {
     var endTime: Date
 }
 
+struct Meeting: Identifiable, Codable {
+    var id = UUID()
+    let title: String
+    let subject: String
+    let description: String
+}
 
 //components
 struct TextFieldClear: View {
@@ -303,6 +309,8 @@ class ProfileViewModel: ObservableObject {
     @Published var shouldNavigateToSchedule: Bool = false
     @Published var shouldNavigateToHome: Bool = false
     @Published var schedules: [ScheduleItem] = []
+    @Published var meetings: [Meeting] = []
+
 
 
     
@@ -339,7 +347,7 @@ class ProfileViewModel: ObservableObject {
 
     
     private let subjectsByProdi: [String: [String]] = [
-        "D3 Sistem Informasi": ["Basis Data", "Pemrograman Web", "Sistem Operasi"],
+        "D3 Sistem Informasi": ["Analisis Bisnis", "Interaksi Manusia Dan Komputer", "Manajemen Proyek Sistem Informasi", "Pemrograman Web", "Pengantar Data Science", "Pengantar Teknologi", "Praktikum Interaksi Manusia Dan Komputer", "Praktikum Pemrograman Web", "Praktikum Sistem Operasi", "Sistem Informasi Manajemen", "Sistem Operasi", "Statistik dan Probabilitas", "Technopreneurship"],
         "S1 Sistem Informasi": ["Analisis Sistem Informasi", "Manajemen Proyek TI", "Business Intelligence"],
         "S1 Informatika": ["Algoritma dan Struktur Data", "Kecerdasan Buatan", "Jaringan Komputer"]
     ]
@@ -449,6 +457,112 @@ class ProfileViewModel: ObservableObject {
     }
     
     let daysOfWeek = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"]
+ 
+    func loadMeetings(for subject: String) {
+        switch subject {
+        case "Analisis Bisnis":
+            meetings = [
+                Meeting(title: "Pengenalan Analisis Proses Bisnis", subject: subject, description: ""),
+                Meeting(title: "Komponen Proses Bisnis", subject: subject, description: ""),
+                Meeting(title: "Model Analisis Bisnis", subject: subject, description: ""),
+                Meeting(title: "Analisis Strategi Bisnis dan Tools Analisis", subject: subject, description: ""),
+                Meeting(title: "Teknik Investigasi", subject: subject, description: ""),
+                Meeting(title: "Analisis lingkungan internal, eksternal dan SWOT", subject: subject, description: ""),
+                Meeting(title: "Analisis dan Manajemen Stakeholder", subject: subject, description: "")
+            ]
+        case "Interaksi Manusia Dan Komputer":
+            meetings = [
+                Meeting(title: "Pengenalan Dasar", subject: subject, description: ""),
+                Meeting(title: "Prinsip Usability", subject: subject, description: ""),
+            ]
+        case "Manajemen Proyek Sistem Informasi":
+            meetings = [
+                Meeting(title: "Manajemen Proyek Sistem Informasi", subject: subject, description: ""),
+                Meeting(title: "Project Management Knowledge Area", subject: subject, description: ""),
+                Meeting(title: "Work Breakdown Structure", subject: subject, description: ""),
+                Meeting(title: "How to do a project", subject: subject, description: ""),
+                Meeting(title: "Planning, Project Team", subject: subject, description: ""),
+                Meeting(title: "Writing a project plan, Risk Manage", subject: subject, description: ""),
+                Meeting(title: "Manajemen Waktu Proyek", subject: subject, description: ""),
+            ]
+        case "Pemrograman Web":
+            meetings = [
+                Meeting(title: "Konsep Dasar Pemrograman Web", subject: subject, description: ""),
+                Meeting(title: "Client Side dan Server Side Programming", subject: subject, description: ""),
+                Meeting(title: "HTML FORM, TABLE, HYPERLINK", subject: subject, description: ""),
+            ]    
+        case "Pengantar Data Science":
+            meetings = [
+                Meeting(title: "Pengantar Sains Data", subject: subject, description: ""),
+                Meeting(title: "Pengantar Data", subject: subject, description: ""),
+            ]
+        case "Pengantar Teknologi Informasi":
+            meetings = [
+                Meeting(title: "Definisi, sejarah, dan perkembangan TI", subject: subject, description: ""),
+                Meeting(title: "Komponen Komputer Perangkat keras CPU, RAM, Storage, Input/Output devices", subject: subject, description: ""),
+                Meeting(title: " Perangkat Lunak: Sistem Operasi, Aplikasi, Software Development", subject: subject, description: ""),
+            ]
+        case "Praktikum Pemrograman Web":
+            meetings = [
+                Meeting(title: "XAMPP", subject: subject, description: ""),
+                Meeting(title: "HTML", subject: subject, description: ""),
+                Meeting(title: "CSS", subject: subject, description: ""),
+                Meeting(title: "Javascript", subject: subject, description: ""),
+            ]
+        case "Praktikum Sistem Operasi":
+            meetings = [
+                Meeting(title: "Instalasi Sistem Operasi Linux", subject: subject, description: ""),
+                Meeting(title: "Instruksi Dasar Sistem Operasi Linux", subject: subject, description: ""),
+                Meeting(title: "Arsitektur Sistem Operasi Linux", subject: subject, description: ""),
+                Meeting(title: "Proses I/O Sistem Operasi Linux", subject: subject, description: ""),
+                Meeting(title: "Proses I/O Sistem Operasi Linux", subject: subject, description: ""),
+                Meeting(title: "Profile, History, dan Job Control", subject: subject, description: ""),
+                Meeting(title: "Proses dan Signalin Sistem Operasi Linux", subject: subject, description: ""),
+                Meeting(title: "Logika menggunakan Variabel Operasi dan kondisi", subject: subject, description: ""),
+            ]
+        case "Sistem Informasi Manajemen":
+            meetings = [
+                Meeting(title: "Konsep Dasar Sistem Business Digital", subject: subject, description: ""),
+                Meeting(title: "The Strategic Roles of Information Systems", subject: subject, description: ""),
+            ]  
+        case "Sistem Operasi":
+            meetings = [
+                Meeting(title: "Penganalan Sistem Operasi", subject: subject, description: ""),
+                Meeting(title: "Manajemen Memory", subject: subject, description: ""),
+            ]
+        case "Statistik dan Probabilitas":
+            meetings = [
+                Meeting(title: "Peranan, Definisi Statistika", subject: subject, description: ""),
+                Meeting(title: "Pengukuran Deskriptif Numerik", subject: subject, description: ""),
+                Meeting(title: "Distribusi Frekuensi", subject: subject, description: ""),
+                Meeting(title: "Ukuran Tendensi Sentral", subject: subject, description: ""),
+                Meeting(title: "Ukuran Kuartil, Desil, Presentil", subject: subject, description: ""),
+                Meeting(title: "Ukuran Dispersi", subject: subject, description: ""),
+                Meeting(title: "Ukuran Kemiringan dan Keruncingan", subject: subject, description: ""),
+            ]
+        case "Technopreneurship":
+            meetings = [
+                Meeting(title: "Pengenalan Technopreunership", subject: subject, description: ""),
+                Meeting(title: "Membentuk Jiwa Wirausaha yang Tangguh", subject: subject, description: ""),
+            ]
+        default:
+            meetings = []
+        }
+    }
+    
+    func saveMeetings() {
+        if let encoded = try? JSONEncoder().encode(meetings) {
+            UserDefaults.standard.set(encoded, forKey: "savedMeetings")
+        }
+    }
+    
+    func loadSavedMeetings() {
+        // Muat pertemuan dari penyimpanan lokal
+        if let savedMeetings = UserDefaults.standard.data(forKey: "savedMeetings"),
+           let decodedMeetings = try? JSONDecoder().decode([Meeting].self, from: savedMeetings) {
+            meetings = decodedMeetings
+        }
+    }
 }
 
 //views
@@ -489,27 +603,85 @@ struct HomeView: View {
 
 struct MataKuliahView: View {
     @ObservedObject var profileViewModel: ProfileViewModel
+    @State private var searchText = ""
     
     var uniqueSubjects: [String] {
         Array(Set(profileViewModel.schedules.map { $0.subject })).sorted()
     }
     
+    var filteredSubjects: [String] {
+        if searchText.isEmpty {
+            return uniqueSubjects
+        } else {
+            return uniqueSubjects.filter { $0.lowercased().contains(searchText.lowercased()) }
+        }
+    }
+    
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
-                ForEach(uniqueSubjects, id: \.self) { subject in
-                    Button(action: {
-                        print("Selected subject: \(subject)")
-                    }) {
-                        Text(subject)
+                ForEach(filteredSubjects, id: \.self) { subject in
+                    NavigationLink(destination: MeetingsView(viewModel: profileViewModel, subject: subject)) {
+                        HStack {
+                            Image(systemName: "book.pages")
+                            Text(subject)
+                                .font(.headline)
+                        }
                     }
                 }
             }
+            .listStyle(.plain)
             .navigationTitle("Mata Kuliah")
+            .searchable(text: $searchText, prompt: "Cari Mata Kuliah")
             .onAppear {
                 profileViewModel.loadSchedulesFromStorage()
+                profileViewModel.loadSavedMeetings()
             }
         }
+    }
+}
+
+struct MeetingsView: View {
+    @ObservedObject var viewModel: ProfileViewModel
+    let subject: String
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(viewModel.meetings.filter { $0.subject == subject }.indices, id: \.self) { index in
+                    NavigationLink(destination: MeetingDetailView(meeting: viewModel.meetings[index])) {
+                        VStack(alignment: .leading) {
+                            Text("Pertemuan \(index + 1)")
+                                .font(.headline)
+                            Text(viewModel.meetings[index].title)
+                                .font(.subheadline)
+                        }
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .navigationBarTitle(subject, displayMode: .large)
+            .onAppear {
+                viewModel.loadMeetings(for: subject)
+            }
+        }
+    }
+}
+
+struct MeetingDetailView: View {
+    let meeting: Meeting
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(meeting.title)
+                .font(.title)
+            Text("Mata Kuliah: \(meeting.subject)")
+                .font(.subheadline)
+            Text(meeting.description)
+                .font(.body)
+        }
+        .padding()
+        .navigationTitle(meeting.title)
     }
 }
 
